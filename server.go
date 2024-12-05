@@ -36,7 +36,10 @@ func ServerCmd() *cobra.Command {
 			initCommand()
 
 			go func() {
-				runHttpServer()
+				runHttpServer(webport)
+			}()
+
+			go func() {
 				runServer(port, path)
 			}()
 
