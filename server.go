@@ -40,17 +40,17 @@ func ServerCmd() *cobra.Command {
 			}()
 
 			go func() {
-				runServer(port, path)
+				runTcpServer(port, path)
 			}()
 
 			<-quit
 		},
 	}
 
-	command.Flags().StringVarP(&path, "path", "", "", "path to serve")
-	command.Flags().StringVarP(&secret, "secret", "", "", "path to serve")
-	command.Flags().IntVarP(&port, "port", "", 0, "path to serve")
-	command.Flags().IntVarP(&webport, "webport", "", 0, "path to serve")
+	command.Flags().StringVarP(&path, "path", "", "", "File save path")
+	command.Flags().StringVarP(&secret, "secret", "", "", "Http transmission key")
+	command.Flags().IntVarP(&port, "port", "", 0, "Tcp server port")
+	command.Flags().IntVarP(&webport, "webport", "", 0, "Http server port")
 	return command
 }
 
@@ -68,10 +68,11 @@ func initCommand() {
 	_ = os.Mkdir(fmt.Sprintf("%s/", path), os.ModePerm)
 }
 
-func runServer(port int, savePath string) {
+func runTcpServer(port int, savePath string) {
+	fn := "runTcpServer"
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		fmt.Println("Error starting server:", err)
+		fmt.Printf("%s starting server err:%s \n", fn, err)
 		return
 	}
 
@@ -79,12 +80,12 @@ func runServer(port int, savePath string) {
 		_ = listener.Close()
 	}()
 
-	fmt.Println("Server is listening on port", port)
+	fmt.Printf("%s is listening on port %d \n", fn, port)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Connection error:", err)
+			fmt.Printf("%s connection error:%s \n", fn, err)
 			continue
 		}
 		go handleConnection(conn, savePath)
@@ -92,61 +93,57 @@ func runServer(port int, savePath string) {
 }
 
 func handleConnection(conn net.Conn, savePath string) {
+	fn := "handleConnection"
 	defer func() {
 		_ = conn.Close()
 	}()
 
 	reader := bufio.NewReader(conn)
 
-	// 读取文件元信息：文件名和文件大小
 	meta, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Println("Error reading file metadata:", err)
+		fmt.Printf("%s reading file metadata:%s \n", fn, err)
 		return
 	}
-	meta = strings.TrimSpace(meta) // 清除换行符
+
+	meta = strings.TrimSpace(meta)
 	parts := strings.Split(meta, "|")
 	if len(parts) != 2 {
-		fmt.Println("Invalid metadata received")
+		fmt.Printf("%s invalid metadata received", fn)
 		return
 	}
+
 	fileName := parts[0]
 	fileSize := 0
-	_, err = fmt.Sscanf(parts[1], "%d", &fileSize)
-	if err != nil {
-		fmt.Println("Error parsing file size:", err)
+	if _, err = fmt.Sscanf(parts[1], "%d", &fileSize); err != nil {
+		fmt.Printf("%s parsing file size err:%s \n", fn, err)
 		return
 	}
 
-	// 确保保存路径存在
 	fullPath := filepath.Join(savePath, fileName)
-
 	if err = os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		fmt.Println("Error creating directories:", err)
+		fmt.Printf("%s creating directories err:%s \n", fn, err)
 		return
 	}
 
-	// 创建文件
 	f, err := os.Create(fullPath)
 	if err != nil {
-		fmt.Println("Error creating file:", err)
+		fmt.Printf("%s creating file:%s \n", fn, err)
 		return
 	}
 	defer func() {
 		_ = f.Close()
 	}()
 
-	// 创建进度条
 	bar := pb.Start64(int64(fileSize))
 	bar.Set(pb.Bytes, true)
 
 	defer bar.Finish()
 
-	// 读取数据并写入文件
 	proxyReader := bar.NewProxyReader(reader)
 	if _, err = io.Copy(f, proxyReader); err != nil {
-		fmt.Println("Error saving file:", err)
+		fmt.Printf("%s saving file:%s", fn, err)
 		return
 	}
-	fmt.Println("File received:", fullPath)
+	fmt.Printf("File received:%s", fullPath)
 }

@@ -9,17 +9,34 @@ import (
 	"strings"
 )
 
-func runHttpServer(port int) {
-	http.HandleFunc("/files", fileListHandler)
-	http.HandleFunc("/download/", fileDownloadHandler)
+const (
+	PathList      = "/files"
+	PathDownload  = "/download/"
+	QueryParamKey = "secret"
+)
 
-	fmt.Printf("File server started at http://localhost:%s\n", port)
+func runHttpServer(port int) {
+	fn := "runHttpServer"
+	http.HandleFunc(PathList, secretFilterHandler(fileListHandler))
+	http.HandleFunc(PathDownload, secretFilterHandler(fileDownloadHandler))
+
+	fmt.Printf("%s is listening on port %d\n", fn, port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
 		fmt.Println("Error starting file server:", err)
 	}
 }
 
-// 查看文件列表的处理器
+func secretFilterHandler(next http.HandlerFunc) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		getSecret := r.URL.Query().Get(QueryParamKey)
+		if getSecret != secret {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
 func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	files, err := os.ReadDir(path)
 	if err != nil {
@@ -45,9 +62,8 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(marshal)
 }
 
-// 文件下载的处理器
 func fileDownloadHandler(w http.ResponseWriter, r *http.Request) {
-	fileName := strings.TrimPrefix(r.URL.Path, "/download/")
+	fileName := strings.TrimPrefix(r.URL.Path, PathDownload)
 	filePath := filepath.Join(path, fileName)
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		http.Error(w, "File not found", http.StatusNotFound)
