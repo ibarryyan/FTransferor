@@ -152,8 +152,13 @@ func httpClient(action Action, f string) {
 			fmt.Println("Error unmarshaling JSON:", err)
 			return
 		}
-		// 打印map
-		fmt.Println("Data as map:", data)
+		fmt.Println("File List:")
+		if val, ok := data["data"]; ok && val != nil {
+			list := val.([]interface{})
+			for i, item := range list {
+				fmt.Printf("Num:%d  File: %s\n", i+1, item)
+			}
+		}
 	default:
 
 	}
