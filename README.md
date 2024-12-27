@@ -1,5 +1,11 @@
 ## FTransferor 
 
+#### Run
+
+```shell
+/bin
+```
+
 #### Build
 
 ```shell

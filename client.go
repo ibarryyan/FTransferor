@@ -160,6 +160,6 @@ func httpClient(action Action, f string) {
 			}
 		}
 	default:
-
+		fmt.Println("no support action")
 	}
 }
