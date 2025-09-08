@@ -1,4 +1,4 @@
-module FTransferor
+module github.com/ibarryyan/FTransferor
 
 go 1.23.1
 
